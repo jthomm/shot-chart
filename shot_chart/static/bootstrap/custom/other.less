@@ -1,0 +1,57 @@
+// body {
+//   background: url('/static/bootstrap/noisy_grid/noisy_grid.png');
+//   background-repeat: repeat;
+// }
+
+.rounded-border(@border-radius-size) {
+  -webkit-border-radius: @border-radius-size;
+     -moz-border-radius: @border-radius-size;
+       -o-border-radius: @border-radius-size;
+          border-radius: @border-radius-size;
+}
+
+.container-row {
+  .rounded-border(@border-radius-large);
+  background-color: rgba(255, 255, 255, 0.67);
+  padding: @line-height-computed;
+  margin-bottom: @line-height-computed;
+}
+
+.btn-foo {
+  .button-variant(@btn-foo-color; @btn-foo-bg; @btn-foo-border);
+  &:hover,
+  &:focus,
+  &:active,
+  &.active,
+  .open .dropdown-toggle& {
+    color: @btn-drk-color;
+    background-color: @btn-drk-bg;
+        border-color: @btn-drk-border;
+  }
+}
+
+.btn-bar {
+  .button-variant(@btn-bar-color; @btn-bar-bg; @btn-bar-border);
+  &:hover,
+  &:focus,
+  &:active,
+  &.active,
+  .open .dropdown-toggle& {
+    color: @btn-drk-color;
+    background-color: @btn-drk-bg;
+        border-color: @btn-drk-border;
+  }
+}
+
+.btn-baz {
+  .button-variant(@btn-baz-color; @btn-baz-bg; @btn-baz-border);
+  &:hover,
+  &:focus,
+  &:active,
+  &.active,
+  .open .dropdown-toggle& {
+    color: @btn-drk-color;
+    background-color: @btn-drk-bg;
+        border-color: @btn-drk-border;
+  }
+}

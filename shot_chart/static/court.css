@@ -1,0 +1,12 @@
+#graph {
+  width:600px;
+  height:365px;
+  background-size:500px;
+  background-image:url('/static/court.png');
+  background-repeat:no-repeat;
+  background-position:bottom center;
+}
+.hexagon {
+  stroke-width:0.5px;
+  opacity:0.67;
+}
