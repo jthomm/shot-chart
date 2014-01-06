@@ -283,12 +283,10 @@ ShotChart = React.createClass({
       backgroundPosition: 'bottom center',
     };
     return (
-      <div className='col-md-8'>
-        <div style={style}>
-          <svg width={chart.graphWidth} height={chart.graphHeight}>
-            {hexagons}
-          </svg>
-        </div>
+      <div style={style}>
+        <svg width={chart.graphWidth} height={chart.graphHeight}>
+          {hexagons}
+        </svg>
       </div>
     );
   },
@@ -344,6 +342,7 @@ App = React.createClass({
   },
 
   loadShotsFromServer: function (team) {
+    this.setState(this.getInitialState());
     $.ajax({
       url: 'http://localhost:5000/api/shots/team/' + team,
       success: function (shots) {
@@ -375,18 +374,11 @@ App = React.createClass({
     return (
       <div>
         <div className='col-md-4'>
-          <div className='row'>
-            <SearchForm loadShotsFromServer={this.loadShotsFromServer} />
-          </div>
-          <div className='row'>
-            <ShooterList
-             shooters={this.state.shooters}
-             selectShooter={this.selectShooter}
-             selectedShooter={this.state.selectedShooter}
-            />
-          </div>
+          <TeamNav loadShotsFromServer={this.loadShotsFromServer} />
         </div>
-        <ShotChart bins={bins} />
+        <div className='col-md-8'>
+          <ShotChart bins={bins} />
+        </div>
       </div>
     );
   },
@@ -395,22 +387,55 @@ App = React.createClass({
 
 
 
-React.renderComponent(<App />, document.getElementById('app'));
-
-
-
 TeamChoice = React.createClass({
 
   onClick: function (e) {
     e.preventDefault();
-    //this.props.renderTeam(this.props.key)
+    this.props.selectTeam(this.props.abbr);
+    this.props.loadShotsFromServer(this.props.abbr);
     return false;
   },
 
   render: function () {
     return (
-      <li onClick={this.onClick}>
+      <li onClick={this.onClick} className={this.props.isActive ? 'active' : ''}>
         <a href="#">{this.props.locating + ' ' + this.props.nickname}</a>
+      </li>
+    );
+  },
+
+});
+
+
+
+DivisionChoice = React.createClass({
+
+  onClick: function (e) {
+    e.preventDefault();
+    this.props.selectDivision(this.props.division);
+    return false;
+  },
+
+  render: function () {
+    var teamChoices = this.props.teams.map(function (team) {
+      return (
+        <TeamChoice
+         loadShotsFromServer={this.props.loadShotsFromServer}
+         selectTeam={this.props.selectTeam}
+         locating={team.locating}
+         nickname={team.nickname}
+         isActive={this.props.activeTeam === team.abbr}
+         abbr={team.abbr}
+         key={team.abbr}
+        />
+      );
+    }.bind(this));
+    return (
+      <li onClick={this.onClick} className={this.props.isActive ? 'active' : ''}>
+        <a href="#">{this.props.division}</a>
+        <ul className='nav'>
+          {teamChoices}
+        </ul>
       </li>
     );
   },
@@ -421,32 +446,63 @@ TeamChoice = React.createClass({
 
 TeamNav = React.createClass({
 
-  getInitialState: function () { return {teams: []}; },
+  getInitialState: function () {
+    return {
+      divisions: [],
+      selectedDivision: null,
+      selectedTeam: null,
+    };
+  },
+
+  selectDivision: function (divisionName) {
+    this.setState({selectedDivision: divisionName});
+  },
+
+  selectTeam: function (teamAbbr) {
+    this.setState({selectedTeam: teamAbbr});
+  },
 
   loadTeamsFromServer: function () {
     $.ajax({
       url: 'http://localhost:5000/api/teams',
       success: function (data) {
-        this.setState({teams: data.teams});
+        var divisionNames = [
+          'Atlantic', 'Central', 'Southeast',
+          'Pacific', 'Northwest', 'Southwest',
+        ];
+        var divisions = divisionNames.map(function (divisionName) {
+          var teams = Q(data.teams).findAll({division: divisionName});
+          return {
+            teams: teams,
+            division: divisionName,
+          };
+        });
+        this.setState({divisions: divisions});
       }.bind(this),
     });
   },
 
+  componentWillMount: function () { this.loadTeamsFromServer(); },
+
   render: function () {
-    this.loadTeamsFromServer();
-    var teamChoices = this.state.teams.map(function (team) {
+    var divisionChoices = this.state.divisions.map(function (division) {
       return (
-        <TeamChoice
-         locating={team.locating}
-         nickname={team.nickname}
-         key={team.abbr}
+        <DivisionChoice
+         loadShotsFromServer={this.props.loadShotsFromServer}
+         selectDivision={this.selectDivision}
+         selectTeam={this.selectTeam}
+         division={division.division}
+         isActive={this.state.selectedDivision === division.division}
+         activeTeam={this.state.selectedTeam}
+         teams={division.teams}
+         key={division.division}
         />
       );
-    });
+    }.bind(this));
     return (
       <div className="bs-sidebar hidden-print affix" role="complementary">
         <ul className="nav bs-sidenav">
-          {teamChoices}
+          {divisionChoices}
         </ul>
       </div>
     );
@@ -456,4 +512,4 @@ TeamNav = React.createClass({
 
 
 
-React.renderComponent(<TeamNav />, document.getElementById('nav'));
+React.renderComponent(<App />, document.getElementById('app'));
