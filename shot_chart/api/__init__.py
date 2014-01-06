@@ -16,12 +16,29 @@ def get_db():
 
 
 
-from flask import Response
+from flask import Response, jsonify
 
-@blueprint.route('/team/<team>')
-def fetch_by_team(team):
+@blueprint.route('/teams')
+def fetch_teams():
     cur = get_db()
-    cur = cur.execute('SELECT json FROM shots WHERE team = ?', (team,))
+    results = cur.execute('SELECT * FROM teams ORDER BY abbr').fetchall()
+    cur.close()
+    keys = ('locating', 'nickname', 'abbr', 'stats_inc_id',)
+    return jsonify({'teams': [dict(zip(keys, result)) for result in results]})
+
+@blueprint.route('/shots/team/<team>')
+def fetch_team(team):
+    cur = get_db()
+    cur = cur.execute('SELECT json FROM shots WHERE team_abbr = ?', (team,))
+    results = [result[0] for result in cur.fetchall()]
+    cur.close()
+    json_string = '[' + ', '.join(results) + ']'
+    return Response(json_string, mimetype='application/json')
+
+@blueprint.route('/shots/shooter/<shooter>')
+def fetch_shooter(shooter):
+    cur = get_db()
+    cur = cur.execute('SELECT json FROM shots WHERE shooter_name = ?', (shooter,))
     results = [result[0] for result in cur.fetchall()]
     cur.close()
     json_string = '[' + ', '.join(results) + ']'

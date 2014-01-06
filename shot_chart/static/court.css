@@ -1,12 +1,18 @@
-#graph {
+/*.graph {
   width:600px;
-  height:365px;
+  height:375px;
   background-size:500px;
   background-image:url('/static/court.png');
   background-repeat:no-repeat;
   background-position:bottom center;
-}
+}*/
 .hexagon {
-  stroke-width:0.5px;
+  stroke-width:0.75px;
   opacity:0.67;
+}
+.hex-pop-td-left {
+  padding-right:20px;
+}
+.hex-pop-td-right {
+  text-align:right;
 }
