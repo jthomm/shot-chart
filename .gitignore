@@ -3,3 +3,4 @@
 .DS_Store
 .env/*
 .webassets-cache/*
+shot_chart/static/.webassets-cache/*

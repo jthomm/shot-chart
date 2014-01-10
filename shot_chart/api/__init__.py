@@ -23,7 +23,8 @@ def fetch_teams():
     cur = get_db()
     results = cur.execute('SELECT * FROM teams ORDER BY abbr').fetchall()
     cur.close()
-    keys = ('locating', 'nickname', 'abbr', 'stats_inc_id',)
+    keys = ('locating', 'nickname', 'abbr',
+            'stats_inc_id', 'conference', 'division',)
     return jsonify({'teams': [dict(zip(keys, result)) for result in results]})
 
 @blueprint.route('/shots/team/<team>')
@@ -38,7 +39,8 @@ def fetch_team(team):
 @blueprint.route('/shots/shooter/<shooter>')
 def fetch_shooter(shooter):
     cur = get_db()
-    cur = cur.execute('SELECT json FROM shots WHERE shooter_name = ?', (shooter,))
+    cur = cur.execute(
+        'SELECT json FROM shots WHERE shooter_name = ?', (shooter,))
     results = [result[0] for result in cur.fetchall()]
     cur.close()
     json_string = '[' + ', '.join(results) + ']'
