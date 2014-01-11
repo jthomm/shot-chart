@@ -429,149 +429,7 @@ var area = new Area({
 
 
 
-/*
-ShooterChoice = React.createClass({
-
-  onClick: function (e) {
-    e.preventDefault();
-    this.props.selectShooter(this.props.key);
-    return false;
-  },
-
-  render: function () {
-    return (
-      <li className={this.props.isActive ? 'active' : ''}>
-        <a href="#" onClick={this.onClick}>
-          {this.props.name}
-          {'\u00A0'}
-          <span className='badge'>{this.props.fga}</span>
-        </a>
-      </li>
-    );
-  },
-
-});
-
-
-
-ShooterList = React.createClass({
-  render: function () {
-    var selectShooter = this.props.selectShooter;
-    var selectedShooter = this.props.selectedShooter;
-    var shooterChoices = this.props.shooters.map(function (shooter) {
-      var info = shooter.shooter;
-      return (
-        <ShooterChoice
-         key={info.si_id}
-         name={info.first_name + ' ' + info.last_name}
-         fga={shooter.$.length}
-         isActive={info.si_id === selectedShooter}
-         selectShooter={selectShooter}
-        />
-      );
-    });
-    return (
-      <div className='well well-sm'>
-        <ul className='nav nav-pills nav-stacked'>
-        {shooterChoices}
-        </ul>
-      </div>
-    );
-  },
-});
-
-
-
-ShotChart = React.createClass({
-
-  render: function () {
-    var radiusScaler = getRadiusScaler(
-      this.props.bins,
-      area.pxPerFt,
-      area.getMeshRadius()
-    );
-    var selectedShooter = this.props.selectedShooter;
-    var hexagons = this.props.bins.map(function (bin) {
-      var meshRadius = area.getMeshRadius() - 0.25
-        , scaled = radiusScaler(bin.$.length)
-        , radius = scaled > meshRadius ? meshRadius : scaled
-        , vertices = getVertices(radius)
-        , efgPct = getEfgPct(bin.$)
-        , fill = colorScaler(efgPct)
-        , key = bin.bin.getId()
-      ;
-      return (
-        <Hexagon
-         vertices={vertices}
-         fill={fill}
-         key={key}
-         x={bin.bin.getX()}
-         y={bin.bin.getY()}
-         efgPct={efgPct}
-         fga={bin.$.length}
-         selectedShooter={selectedShooter}
-        />
-      );
-    });
-    var style = {
-      width: area.width,
-      height: area.width,
-      backgroundSize: 500,
-      backgroundImage: "url('/static/court.png')",
-      backgroundRepeat: 'no-repeat',
-      backgroundPosition: 'bottom center',
-    };
-    return (
-      <div style={style}>
-        <svg width={area.width} height={area.height}>
-          {hexagons}
-        </svg>
-      </div>
-    );
-  },
-
-});
-
-
-
-SearchForm = React.createClass({
-
-  onSubmit: function (e) {
-    e.preventDefault();
-    var $el = this.refs.shooter.getDOMNode()
-      , shooter = $el.value.trim();
-    ;
-    if (shooter !== '') {
-      this.props.loadShotsFromServer(shooter);
-      $el.value = '';
-    }
-    return false;
-  },
-
-  render: function () {
-    return (
-      <form className='form-inline' role='form' onSubmit={this.onSubmit}>
-        <div className='form-group'>
-          <label className='sr-only' htmlFor='search'>Search</label>
-          <input
-           className='form-control'
-           type='text'
-           placeholder='Search...'
-           ref='shooter'
-          />
-        </div>
-        {'\u00A0'}
-        <button className='btn btn-default' type='submit'>Chart!</button>
-      </form>
-    );
-  },
-
-});
-*/
-
-
-
-TeamChoice = React.createClass({
+var TeamChoice = React.createClass({
 
   onClick: function (e) {
     e.preventDefault();
@@ -592,7 +450,7 @@ TeamChoice = React.createClass({
 
 
 
-DivisionChoice = React.createClass({
+var DivisionChoice = React.createClass({
 
   onClick: function (e) {
     e.preventDefault();
@@ -628,7 +486,7 @@ DivisionChoice = React.createClass({
 
 
 
-TeamNav = React.createClass({
+var TeamNav = React.createClass({
 
   getInitialState: function () {
     return {
@@ -684,7 +542,7 @@ TeamNav = React.createClass({
       );
     }.bind(this));
     return (
-      <div className="bs-sidebar hidden-print affix" role="complementary">
+      <div className="bs-sidebar hidden-print" role="complementary">
         <ul className="nav bs-sidenav">
           {divisionChoices}
         </ul>
@@ -696,7 +554,7 @@ TeamNav = React.createClass({
 
 
 
-Popover = React.createClass({
+var Popover = React.createClass({
   render: function () {
     return (
       <table>
@@ -715,7 +573,7 @@ Popover = React.createClass({
 
 
 
-Hexagon = React.createClass({
+var Hexagon = React.createClass({
 
   render: function () {
     return (
@@ -757,7 +615,7 @@ Hexagon = React.createClass({
 
 
 
-ShotChart = React.createClass({
+var ShotChart = React.createClass({
 
   render: function () {
     var i = 0
@@ -802,21 +660,114 @@ ShotChart = React.createClass({
 
 
 
-App = React.createClass({
+var SearchOpt = React.createClass({
+
+  onClick: function (e) {
+    e.preventDefault();
+    this.props.selectOption(this.props.option);
+    return false;
+  },
+
+  render: function () {
+    return <li onClick={this.onClick}><a href='#'>{this.props.option}</a></li>;
+  },
+
+});
+
+
+
+var Search = React.createClass({
+
+  getInitialState: function () {
+    return {
+      selectedOption: 'Offense',
+      selectedTeamAbbr: null,
+    };
+  },
+
+  selectOption: function (option) { this.setState({selectedOption: option}); },
+
+  setTypeAhead: function (data) {
+    $.ajax({
+      url: 'http://localhost:5000/api/teams',
+      success: function (data) {
+        var teams = data.teams
+          , n = teams.length
+          , i = 0
+          , team
+          , $el = $(this.refs.search.getDOMNode())
+        ;
+        while (i < n) {
+          team = teams[i];
+          i += 1;
+          team.name = [team.locating, team.nickname].join(' ');
+        }
+        $el.typeahead({name: 'team-search', local: teams, valueKey: 'name',});
+        $el.on('typeahead:selected', function (e, datum) {
+          e.preventDefault();
+          this.setState({selectedTeamAbbr: datum.abbr});
+          return false;
+        }.bind(this));
+      }.bind(this),
+    });
+  },
+
+  componentDidMount: function () { this.setTypeAhead(); },
+
+  onSubmit: function (e) {
+    e.preventDefault();
+    if (this.state.selectedTeamAbbr) {
+      this.props.loadShotsFromServer(
+        this.state.selectedOption.toLowerCase(),
+        this.state.selectedTeamAbbr
+      );
+    }
+    $(this.refs.search.getDOMNode()).typeahead('setQuery', '');
+    return false;
+  },
+
+  render: function () {
+    return (
+      <form className='form-inline' role='form' onSubmit={this.onSubmit}>
+        <div className='input-group'>
+          <div className='input-group-btn'>
+            <button
+             type='button'
+             className='btn btn-default dropdown-toggle'
+             data-toggle='dropdown'>
+              {this.state.selectedOption}
+              {'\u00A0'}
+              <i className='fa fa-caret-down'></i>
+            </button>
+            <ul className='dropdown-menu'>
+              <SearchOpt option='Offense' selectOption={this.selectOption} />
+              <SearchOpt option='Defense' selectOption={this.selectOption} />
+            </ul>
+          </div>
+          <input type='text' className='form-control' ref='search' />
+          <input type='submit' className='hidden-submit' />
+        </div>
+      </form>
+    );
+  },
+
+});
+
+
+
+var App = React.createClass({
 
   getInitialState: function () {
     return {
       points: [],
-      isLoading: true,
+      isLoading: false,
     };
   },
 
-  componentWillMount: function () { this.setState({isLoading: false,}); },
-
-  loadShotsFromServer: function (team) {
-    this.setState(this.getInitialState());
+  loadShotsFromServer: function (option, value) {
+    this.setState({isLoading: true});
     $.ajax({
-      url: 'http://localhost:5000/api/shots/team/' + team,
+      url: 'http://localhost:5000/api/shots/' + option + '/' + value,
       success: function (data) {
         var points = makePoints(area, data);
         this.setState({
@@ -828,11 +779,14 @@ App = React.createClass({
   },
 
   render: function () {
-    var chartArea = this.state.isLoading ? <h3>LOADING...</h3> : <ShotChart bins={makeBins(area, this.state.points)} />;
+    var chartArea = this.state.isLoading
+      ? <h3>LOADING...</h3>
+      : <ShotChart bins={makeBins(area, this.state.points)} />
+    ;
     return (
       <div>
         <div className='col-md-4'>
-          <TeamNav loadShotsFromServer={this.loadShotsFromServer} />
+          <Search loadShotsFromServer={this.loadShotsFromServer} />
         </div>
         <div className='col-md-8'>
           {chartArea}
