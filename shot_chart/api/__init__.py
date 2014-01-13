@@ -27,8 +27,18 @@ def fetch_teams():
             'stats_inc_id', 'conference', 'division',)
     return jsonify({'teams': [dict(zip(keys, result)) for result in results]})
 
-@blueprint.route('/shots/team/<team>')
-def fetch_team(team):
+@blueprint.route('/shots/shooter/<shooter>')
+def fetch_shooter(shooter):
+    cur = get_db()
+    cur = cur.execute(
+        'SELECT json FROM shots WHERE shooter_name = ?', (shooter,))
+    results = [result[0] for result in cur.fetchall()]
+    cur.close()
+    json_string = '[' + ', '.join(results) + ']'
+    return Response(json_string, mimetype='application/json')
+
+@blueprint.route('/shots/offense/<team>')
+def fetch_offense(team):
     cur = get_db()
     cur = cur.execute('SELECT json FROM shots WHERE team_abbr = ?', (team,))
     results = [result[0] for result in cur.fetchall()]
@@ -36,11 +46,15 @@ def fetch_team(team):
     json_string = '[' + ', '.join(results) + ']'
     return Response(json_string, mimetype='application/json')
 
-@blueprint.route('/shots/shooter/<shooter>')
-def fetch_shooter(shooter):
+@blueprint.route('/shots/defense/<team>')
+def fetch_defense(team):
     cur = get_db()
-    cur = cur.execute(
-        'SELECT json FROM shots WHERE shooter_name = ?', (shooter,))
+    cur = cur.execute('''
+        SELECT json
+          FROM shots
+         WHERE     team_abbr != ?
+               AND ? IN (away_abbr, home_abbr)
+    ''', (team, team,))
     results = [result[0] for result in cur.fetchall()]
     cur.close()
     json_string = '[' + ', '.join(results) + ']'

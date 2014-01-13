@@ -107,6 +107,21 @@
       .navbar-static-top {
         margin-bottom: 10px;
       }
+
+      .hidden-submit {
+        position:absolute;
+        left:-9999px;
+        width:1px;
+        height:1px;
+      }
+
+
+hexagon:focus {
+  box-shadow: 0 0 5px rgba(81, 203, 238, 1);
+  padding: 3px 0px 3px 3px;
+  margin: 5px 1px 3px 0px;
+  border: 1px solid rgba(81, 203, 238, 1);
+}
     </style>
 
   </head>
@@ -114,10 +129,12 @@
 
     <div class="container">
 
-      <div class="row">
-        <h3 class="text-muted">
-          <i class="fa fa-bar-chart-o"></i> FANTASOLVE
-        </h3>
+      <div class="row" style="margin-bottom:20px;">
+        <div class="col-md-12">
+          <h3 class="text-muted">
+            <i class="fa fa-bar-chart-o"></i> FANTASOLVE
+          </h3>
+        </div>
       </div>
 
       <div class="row" id="app">

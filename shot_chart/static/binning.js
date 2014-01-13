@@ -146,8 +146,9 @@
       .range([
         0,
         area.pxPerFt/2.5,
-        area.getMeshRadius()
+        area.getMeshRadius() - 0.1
       ])
+      .clamp(true)
     ;
   }
 
@@ -183,15 +184,29 @@
     return 'm' + vertices.join('l') + 'z';
   }
 
+  function getSumPts(shots) {
+    var i = 0
+      , n = shots.length
+      , shot
+      , pts = 0
+    ;
+    while (i < n) {
+      shot = shots[i];
+      i += 1;
+      if (shot.event_desc === 'Field Goal Made') {
+        pts += shot.point_value;
+      }
+    }
+    return pts;
+  }
+
   function addHexAttrs(bin, area, radiusScaler, colorScaler) {
 
     var transform = 'translate(' + bin.x + ',' + bin.y + ')'
       , fga = bin.points.length
 
-      , maxRadius = area.getMeshRadius() - 0.25
       , scaled = radiusScaler(fga)
-      , radius = scaled > maxRadius ? maxRadius : scaled
-      , vertices = getVertices(radius)
+      , vertices = getVertices(scaled)
 
       , pts = 0
       , i = 0
@@ -222,7 +237,6 @@
       fill: fill,
     };
     bin.stroke = stroke;
-    bin.radius = radius;
 
   }
 
@@ -367,46 +381,11 @@
 
   }
 
-  /*function __makeBins(area, points) {
-
-    var groups = Q(points).groupBy('bin')
-      , n = groups.length
-      , i = 0
-      , group
-      , radiusScaler
-      , bins = []
-      , m = 0
-      , j = 0
-    ;
-    while (i < n) {
-      group = groups[i];
-      i += 1;
-      bins.push({
-        i: group.bin.i,
-        j: group.bin.j,
-        x: group.bin.x,
-        y: group.bin.y,
-        id: group.bin.id,
-        points: group.$,
-      });
-    }
-
-    radiusScaler = makeRadiusScaler(area, bins);
-    m = bins.length;
-
-    while (j < m) {
-      addHexAttrs(bins[j], area, radiusScaler, colorScaler);
-      j += 1;
-    }
-
-    return bins;
-
-  }*/
-
 
 
   this.makePoints = makePoints;
   this.makeBins = makeBins;
+  this.getSumPts = getSumPts;
 
 
 
