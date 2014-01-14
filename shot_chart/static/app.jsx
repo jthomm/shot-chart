@@ -9,6 +9,26 @@ var area = new Area({
   hexagonsPerRow: 26,
 });
 
+var tagNames = [
+  'jump',
+  'dunk',
+  'bank',
+  'hook',
+  'running',
+  'driving',
+  'layup',
+  'turnaround',
+  'reverse',
+  'fade away',
+  'put back',
+  'finger roll',
+  'pull up',
+  'tip',
+  'alley oop',
+  'floating',
+  'step back',
+];
+
 
 
 /*var ShooterChoice = React.createClass({
@@ -147,7 +167,7 @@ var SearchForm = React.createClass({
     );
   },
 
-});*/
+});
 
 
 
@@ -272,7 +292,7 @@ var TeamNav = React.createClass({
     );
   },
 
-});
+});*/
 
 
 
@@ -337,21 +357,40 @@ var Hexagon = React.createClass({
 
 
 
-var ShotChart = React.createClass({
+var ChartArea = React.createClass({
 
   render: function () {
-    var i = 0
-      , n = this.props.bins.length
-      , bin
-      , hexagons = []
-      , style = {
+    console.log('[LOGGING]\t', 'ChartArea', 'render', this.state);
+    var style = {
       width: area.width,
       height: area.height,
       backgroundSize: 500,
       backgroundImage: "url('/static/court.png')",
       backgroundRepeat: 'no-repeat',
       backgroundPosition: 'bottom center',
-    }
+      margin: '0 auto',
+    };
+    return (
+      <div className='row'>
+        <div style={style}>
+          {this.props.chartContents}
+        </div>
+      </div>
+    );
+  },
+
+});
+
+
+
+var ShotChart = React.createClass({
+
+  render: function () {
+    console.log('[LOGGING]\t', 'ShotChart', 'render', this.state);
+    var i = 0
+      , n = this.props.bins.length
+      , bin
+      , hexagons = []
     ;
     while (i < n) {
       bin = this.props.bins[i];
@@ -370,11 +409,9 @@ var ShotChart = React.createClass({
       );
     }
     return (
-      <div style={style}>
-        <svg width={area.width} height={area.height}>
-          {hexagons}
-        </svg>
-      </div>
+      <svg width={area.width} height={area.height}>
+        {hexagons}
+      </svg>
     );
   },
 
@@ -410,6 +447,7 @@ var Search = React.createClass({
   selectOption: function (option) { this.setState({selectedOption: option}); },
 
   setTypeAhead: function (data) {
+    console.log('[LOGGING]\t', 'Search', 'setTypeAhead', this.state);
     $.ajax({
       url: 'http://localhost:5000/api/teams',
       success: function (data) {
@@ -437,6 +475,7 @@ var Search = React.createClass({
   componentDidMount: function () { this.setTypeAhead(); },
 
   onSubmit: function (e) {
+    console.log('[LOGGING]\t', 'Search', 'onSubmit', this.state);
     e.preventDefault();
     if (this.state.selectedTeamAbbr) {
       this.props.loadShotsFromServer(
@@ -449,6 +488,7 @@ var Search = React.createClass({
   },
 
   render: function () {
+    console.log('[LOGGING]\t', 'Search', 'render', this.state);
     return (
       <form className='form-inline' role='form' onSubmit={this.onSubmit}>
         <div className='input-group'>
@@ -477,18 +517,97 @@ var Search = React.createClass({
 
 
 
+var Statistic = React.createClass({
+
+  render: function () {
+    return (
+      <div className='col-md-3 stat'>
+        <h3>{this.props.value}</h3>
+        <h4 className='text-muted'>{this.props.name}</h4>
+      </div>
+    );
+  },
+
+});
+
+
+
 var Stats = React.createClass({
 
   render: function () {
-    var fga = this.props.points.length
+    console.log('[LOGGING]\t', 'Stats', 'render', this.state);
+    var q = Q(this.props.points)
+      , fga = this.props.points.length
+      , fgm = q.findAll({event_desc: 'Field Goal Made'}).length
+      , wpa = q.findAll({point_value: 2}).length
+      , wpm = q.findAll({event_desc: 'Field Goal Made', point_value: 2}).length
+      , wpp = (100*(wpm/wpa)).toFixed(1)
+      , hpp = (100*((fgm - wpm)/(fga - wpa))).toFixed(1)
       , pts = getSumPts(this.props.points)
-      , efg = fga === 0 ? '' : (pts/fga).toFixed(2)
+      , efg = fga === 0 ? 'N/A' : (pts/fga).toFixed(2)
     ;
     return (
-      <span>
-        <h3>{fga} <span className='muted'>FGA</span></h3>
-        <h3>{efg} <span className='muted'>eFG%</span></h3>
-      </span>
+      <div className='row'>
+        <Statistic value={fga} name='FGA' />
+        <Statistic value={efg} name='PPS' />
+        <Statistic value={wpp} name='2pFG%' />
+        <Statistic value={hpp} name='3pFG%' />
+      </div>
+    );
+  },
+
+});
+
+
+
+var Tag = React.createClass({
+
+  onClick: function (e) {
+    e.preventDefault();
+    this.props.setActiveTag(this.props.name);
+    return false;
+  },
+
+  render: function () {
+    return (
+      <li className={this.props.isActive ? 'active' : ''}>
+        <a href='#' onClick={this.onClick}>{this.props.name}</a>
+      </li>
+    );
+  },
+
+});
+
+
+
+var Tags = React.createClass({
+
+  getInitialState: function () { return {activeTag: null}; },
+
+  setActiveTag: function (tagName) { this.setState({activeTag: tagName}); },
+
+  render: function () {
+    console.log('[LOGGING]\t', 'Tags', 'render', this.state);
+    var n = tagNames.length
+      , i = 0
+      , tagName
+      , tags = []
+    ;
+    while (i < n) {
+      tagName = tagNames[i];
+      i += 1;
+      tags.push(
+        <Tag
+         name={tagName}
+         isActive={this.state.activeTag === tagName}
+         setActiveTag={this.setActiveTag}
+        />
+      );
+    }
+    return (
+      <ul className='nav nav-pills nav-stacked'>
+        {tags}
+      </ul>
     );
   },
 
@@ -506,7 +625,11 @@ var App = React.createClass({
   },
 
   loadShotsFromServer: function (option, value) {
-    this.setState({isLoading: true});
+    console.log('[LOGGING]\t', 'App', 'loadShotsFromServer', this.state);
+    this.setState({
+      points: [],
+      isLoading: true,
+    });
     $.ajax({
       url: 'http://localhost:5000/api/shots/' + option + '/' + value,
       success: function (data) {
@@ -520,18 +643,20 @@ var App = React.createClass({
   },
 
   render: function () {
-    var chartArea = this.state.isLoading
-      ? <h3>LOADING...</h3>
+    console.log('[LOGGING]\t', 'App', 'render', this.state);
+    var chartContents = this.state.isLoading
+      ? <Spinner />
       : <ShotChart bins={makeBins(area, this.state.points)} />
     ;
     return (
       <div>
-        <div className='col-md-5'>
+        <div className='col-md-4'>
           <Search loadShotsFromServer={this.loadShotsFromServer} />
+          <Tags />
         </div>
-        <div className='col-md-7'>
+        <div className='col-md-8'>
+          <ChartArea chartContents={chartContents} />
           <Stats points={this.state.points} />
-          {chartArea}
         </div>
       </div>
     );
