@@ -7,7 +7,7 @@
   background-position:bottom center;
 }*/
 .hexagon {
-  /*stroke-width:0.75px;*/
+  /*stroke-width:1.5px;*/
   opacity:0.67;
 }
 .hex-pop-td-left {
@@ -16,3 +16,13 @@
 .hex-pop-td-right {
   text-align:right;
 }
+.hidden-submit {
+  position:absolute;
+  left:-9999px;
+  width:1px;
+  height:1px;
+}
+.stat-foo {
+  text-align:center;
+}
+

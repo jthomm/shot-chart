@@ -1,5 +1,5 @@
 (function () {
-
+var root = this;
 
 
   function Area(options) {
@@ -325,7 +325,7 @@
       }
     }
 
-    return points;
+    root.points = points; return points;
 
   }
 

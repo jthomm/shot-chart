@@ -440,7 +440,7 @@ var Search = React.createClass({
   getInitialState: function () {
     return {
       selectedOption: 'Offense',
-      selectedTeamAbbr: null,
+      selectedTeam: null,
     };
   },
 
@@ -465,7 +465,7 @@ var Search = React.createClass({
         $el.typeahead({name: 'team-search', local: teams, valueKey: 'name',});
         $el.on('typeahead:selected', function (e, datum) {
           e.preventDefault();
-          this.setState({selectedTeamAbbr: datum.abbr});
+          this.setState({selectedTeam: datum});
           return false;
         }.bind(this));
       }.bind(this),
@@ -477,10 +477,10 @@ var Search = React.createClass({
   onSubmit: function (e) {
     console.log('[LOGGING]\t', 'Search', 'onSubmit', this.state);
     e.preventDefault();
-    if (this.state.selectedTeamAbbr) {
+    if (this.state.selectedTeam) {
       this.props.loadShotsFromServer(
         this.state.selectedOption.toLowerCase(),
-        this.state.selectedTeamAbbr
+        this.state.selectedTeam
       );
     }
     $(this.refs.search.getDOMNode()).typeahead('setQuery', '');
@@ -517,6 +517,23 @@ var Search = React.createClass({
 
 
 
+var _Statistic = React.createClass({
+
+  render: function () {
+    return (
+      <div className='row'>
+        <div className='col-md-12'>
+          <h3>{this.props.value}</h3>
+          <h4 className='text-muted'>{this.props.name}</h4>
+        </div>
+      </div>
+    );
+  },
+
+});
+
+
+
 var Statistic = React.createClass({
 
   render: function () {
@@ -524,6 +541,34 @@ var Statistic = React.createClass({
       <div className='col-md-3 stat'>
         <h3>{this.props.value}</h3>
         <h4 className='text-muted'>{this.props.name}</h4>
+      </div>
+    );
+  },
+
+});
+
+
+
+var _Stats = React.createClass({
+
+  render: function () {
+    console.log('[LOGGING]\t', 'Stats', 'render', this.state);
+    var q = Q(this.props.points)
+      , fga = this.props.points.length
+      , fgm = q.findAll({event_desc: 'Field Goal Made'}).length
+      , wpa = q.findAll({point_value: 2}).length
+      , wpm = q.findAll({event_desc: 'Field Goal Made', point_value: 2}).length
+      , wpp = fga === 0 ? '\u00A0' : (100*(wpm/wpa)).toFixed(1)
+      , hpp = fga === 0 ? '\u00A0' : (100*((fgm - wpm)/(fga - wpa))).toFixed(1)
+      , pts = getSumPts(this.props.points)
+      , efg = fga === 0 ? '\u00A0' : (pts/fga).toFixed(2)
+    ;
+    return (
+      <div className='col-md-2'>
+        <Statistic value={fga} name='FGA' />
+        <Statistic value={efg} name='PPS' />
+        <Statistic value={wpp} name='2pFG%' />
+        <Statistic value={hpp} name='3pFG%' />
       </div>
     );
   },
@@ -541,14 +586,14 @@ var Stats = React.createClass({
       , fgm = q.findAll({event_desc: 'Field Goal Made'}).length
       , wpa = q.findAll({point_value: 2}).length
       , wpm = q.findAll({event_desc: 'Field Goal Made', point_value: 2}).length
-      , wpp = (100*(wpm/wpa)).toFixed(1)
-      , hpp = (100*((fgm - wpm)/(fga - wpa))).toFixed(1)
+      , wpp = fga === 0 ? '\u00A0' : (100*(wpm/wpa)).toFixed(1)
+      , hpp = fga === 0 ? '\u00A0' : (100*((fgm - wpm)/(fga - wpa))).toFixed(1)
       , pts = getSumPts(this.props.points)
-      , efg = fga === 0 ? 'N/A' : (pts/fga).toFixed(2)
+      , efg = fga === 0 ? '\u00A0' : (pts/fga).toFixed(2)
     ;
     return (
       <div className='row'>
-        <Statistic value={fga} name='FGA' />
+        <Statistic value={fga === 0 ? '\u00A0' : fga} name='FGA' />
         <Statistic value={efg} name='PPS' />
         <Statistic value={wpp} name='2pFG%' />
         <Statistic value={hpp} name='3pFG%' />
@@ -564,7 +609,7 @@ var Tag = React.createClass({
 
   onClick: function (e) {
     e.preventDefault();
-    this.props.setActiveTag(this.props.name);
+    this.props.toggleActive(this.props.name);
     return false;
   },
 
@@ -582,9 +627,31 @@ var Tag = React.createClass({
 
 var Tags = React.createClass({
 
-  getInitialState: function () { return {activeTag: null}; },
+  getInitialState: function () { return {activeTags: {}}; },
 
-  setActiveTag: function (tagName) { this.setState({activeTag: tagName}); },
+  isActiveTag: function (tagName) {
+    return this.state.activeTags.hasOwnProperty(tagName);
+  },
+
+  addActiveTag: function (tagName) {
+    var activeTags = this.state.activeTags;
+    activeTags[tagName] = null;
+    this.setState({activeTags: activeTags});
+  },
+
+  remActiveTag: function (tagName) {
+    var activeTags = this.state.activeTags;
+    delete activeTags[tagName];
+    this.setState({activeTags: activeTags});
+  },
+
+  toggleActiveTag: function (tagName) {
+    if (this.isActiveTag(tagName)) {
+      this.remActiveTag(tagName);
+    } else {
+      this.addActiveTag(tagName);
+    }
+  },
 
   render: function () {
     console.log('[LOGGING]\t', 'Tags', 'render', this.state);
@@ -599,8 +666,8 @@ var Tags = React.createClass({
       tags.push(
         <Tag
          name={tagName}
-         isActive={this.state.activeTag === tagName}
-         setActiveTag={this.setActiveTag}
+         isActive={this.isActiveTag(tagName)}
+         toggleActive={this.toggleActiveTag}
         />
       );
     }
@@ -619,19 +686,21 @@ var App = React.createClass({
 
   getInitialState: function () {
     return {
+      team: null,
       points: [],
       isLoading: false,
     };
   },
 
-  loadShotsFromServer: function (option, value) {
+  loadShotsFromServer: function (option, team) {
     console.log('[LOGGING]\t', 'App', 'loadShotsFromServer', this.state);
     this.setState({
+      team: team,
       points: [],
       isLoading: true,
     });
     $.ajax({
-      url: 'http://localhost:5000/api/shots/' + option + '/' + value,
+      url: 'http://localhost:5000/api/shots/' + option + '/' + team.abbr,
       success: function (data) {
         var points = makePoints(area, data);
         this.setState({
@@ -645,18 +714,45 @@ var App = React.createClass({
   render: function () {
     console.log('[LOGGING]\t', 'App', 'render', this.state);
     var chartContents = this.state.isLoading
-      ? <Spinner />
-      : <ShotChart bins={makeBins(area, this.state.points)} />
+        ? <Spinner />
+        : <ShotChart bins={makeBins(area, this.state.points)} />
+      , team = this.state.team
+      //, teamName = team ? team.name.toUpperCase() : '\u00A0'
+      //, teamName = team ? team.name.toUpperCase() : 'Choose a team'
+      , teamName = team
+        ? <h4>{team.name.toUpperCase()}</h4>
+        : <h4 className='text-muted'>Choose a team</h4>
     ;
     return (
       <div>
-        <div className='col-md-4'>
-          <Search loadShotsFromServer={this.loadShotsFromServer} />
-          <Tags />
-        </div>
-        <div className='col-md-8'>
-          <ChartArea chartContents={chartContents} />
-          <Stats points={this.state.points} />
+        <div className='col-md-12'>
+
+
+          <div className='row marg-bot'>
+            <div className='col-md-4'>
+              <Search loadShotsFromServer={this.loadShotsFromServer} />
+            </div>
+          </div>
+
+
+          <div className='row'>
+            <div className='col-md-4'>
+              {teamName}
+              <Stats points={this.state.points} />
+            </div>
+          </div>
+
+
+          <div className='row'>
+
+            <div className='col-md-8'>
+              <ChartArea chartContents={chartContents} />
+
+            </div>
+
+          </div>
+
+
         </div>
       </div>
     );

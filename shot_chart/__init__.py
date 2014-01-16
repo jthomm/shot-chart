@@ -16,6 +16,7 @@ from flask.ext.assets import Environment, Bundle
 assets = Environment(app)
 
 assets.register('css', Bundle('court.css',
+                              'react-spinner/react-spinner.css',
                               Bundle('bootstrap/custom/bootstrap.less',
                                      depends=['bootstrap/custom/*.less'],
                                      filters='less'),
@@ -42,5 +43,6 @@ assets.register('js', Bundle('jquery-1.10.2.js',
                              'smartmatch.js',
                              'quarry.js',
                              'binning.js',
+                             'react-spinner/react-spinner.js',
                              #'app.js',
                              output='bundle.js'))
