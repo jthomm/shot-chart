@@ -1,421 +1,3 @@
-//// binning.js ////
-
-(function () {
-
-
-
-  function Area(options) {
-
-    this.pxPerFt = options.pxPerFt;
-    this.width = options.width;
-    this.height = options.height;
-    this.hexagonsPerRow = options.hexagonsPerRow;
-
-    this.getOrigin = function () {
-      var pxPerFt = this.pxPerFt;
-      return {
-        x: this.width/2/pxPerFt,
-        y: this.height/pxPerFt - 5.353,
-      };
-    };
-
-    this.getMeshRadius = function () {
-      return this.width/this.hexagonsPerRow/Math.sin(Math.PI/3);
-    };
-
-    this.getDx = function () {
-      return 2.0*Math.sin(Math.PI/3)*this.getMeshRadius();
-    };
-
-    this.getDy = function () {
-      return 1.5*this.getMeshRadius();
-    };
-
-    this.translateX = function (point) {
-      return this.pxPerFt*(this.getOrigin().x + point.x);
-    };
-
-    this.translateY = function (point) {
-      return this.pxPerFt*(this.getOrigin().y - point.y);
-    };
-
-  }
-
-
-
-  function Bin(options) {
-
-    this.area = options.area;
-    this.i = options.i;
-    this.j = options.j;
-
-    this.getId = function () {
-      return this.i + ',' + this.j;
-    };
-
-    this.getX = function () {
-      return this.area.getDx()*(this.i + (this.j & 1 ? 1/2 : 0));
-    };
-
-    this.getY = function () {
-      return this.area.getDy()*(this.j);
-    };
-
-  }
-
-
-
-  function asPoint() {
-
-    // `.area`
-    // `.x`
-    // `.y`
-
-    this.getX = function () {
-      return this.area.translateX(this);
-    };
-
-    this.getY = function () {
-      return this.area.translateY(this);
-    };
-
-    this.getBin = function () {
-
-      var bin
-        , py
-        , pj
-        , px
-        , pi
-        , py1
-        , py2
-        , pj2
-        , px1
-        , px2
-        , pi2
-        , dy = this.area.getDy()
-        , dx = this.area.getDx()
-      ;
-
-      py = this.getY()/dy;
-      pj = Math.round(py);
-
-      px = this.getX()/dx;
-      pi = Math.round(px);
-
-      py1 = py - pj;
-
-      if (3*Math.abs(py1) > 1) {
-        px1 = px - pi;
-        pj2 = pj + (py < pj ? -1 : 1);
-        pi2 = pi + (px < pi ? -1 : 1)/2;
-        py2 = py - pj2;
-        px2 = px - pi2;
-        if (px1*px1 + py1*py1 > px2*px2 + py2*py2) {
-          pi = pi2 + (pj & 1 ? 1 : -1)/2;
-          pj = pj2;
-        }
-      }
-
-      bin = new Bin({
-        area: this.area,
-        i: pi,
-        j: pj,
-      });
-
-      return bin;
-
-    }
-
-    return this;
-
-  }
-
-
-
-  this.Area = Area;
-  this.Bin = Bin;
-  this.asPoint = asPoint;
-
-
-
-  function makeRadiusScaler(area, bins) {
-    return d3.scale.sqrt()
-      .domain([
-        0,
-        1,
-        ss.quantile(bins.map(function (bin) { return bin.points.length; }), 0.9),
-      ])
-      .range([
-        0,
-        area.pxPerFt/2.5,
-        area.getMeshRadius()
-      ])
-    ;
-  }
-
-  var colorScaler = d3.scale.linear()
-    .domain([0, 0.8, 2])
-    .range(['rgb(69, 117, 180)', 'rgb(255, 255, 191)', 'rgb(215, 48, 39)'])
-    .interpolate(d3.interpolateLab)
-  ;
-
-  function getVertices(radius) {
-    var angles = d3.range(0, 2*Math.PI, Math.PI/3)
-      , x0 = 0
-      , y0 = 0
-      , x1
-      , y1
-      , dx
-      , dy
-      , angle
-      , vertices = []
-      , i = 0
-    ;
-    while (i < 7) {
-      angle = angles[i];
-      i += 1;
-      x1 =  radius*Math.sin(angle);
-      y1 = -radius*Math.cos(angle);
-      dx = x1 - x0;
-      dy = y1 - y0;
-      vertices.push([dx, dy]);
-      x0 = x1;
-      y0 = y1;
-    }
-    return 'm' + vertices.join('l') + 'z';
-  }
-
-  function addHexAttrs(bin, area, radiusScaler, colorScaler) {
-
-    var transform = 'translate(' + bin.x + ',' + bin.y + ')'
-      , fga = bin.points.length
-
-      , maxRadius = area.getMeshRadius() - 0.25
-      , scaled = radiusScaler(fga)
-      , radius = scaled > maxRadius ? maxRadius : scaled
-      , vertices = getVertices(radius)
-
-      , pts = 0
-      , i = 0
-      , shot
-
-      , efgPct
-      , fill
-      , stroke
-    ;
-
-    while (i < fga) {
-      shot = bin.points[i];
-      i += 1;
-      if (shot.event_desc === 'Field Goal Made') {
-        pts += shot.point_value;
-      }
-    }
-
-    efgPct = pts/fga;
-    fill = colorScaler(efgPct);
-    stroke = d3.rgb(fill).darker();
-
-    bin.fga = fga;
-    bin.transform = transform;
-    bin.d = vertices;
-    bin.efgPct = efgPct;
-    bin.style = {
-      fill: fill,
-    };
-    bin.stroke = stroke;
-    bin.radius = radius;
-
-  }
-
-  function _makeBins(area, data) {
-
-    var n = data.length
-      , i = 0
-      , datum
-      , point
-      , bin
-      , binId
-      , binsById = {}
-      , radiusScaler
-      , bins = []
-      , m = 0
-      , j = 0
-    ;
-
-    while (i < n) {
-      datum = data[i];
-      i += 1;
-      if (datum.y < 28 && datum.x < 25 && datum.x > -25) {
-      point = asPoint.call(datum);
-      point.area = area;
-      bin = point.getBin();
-      binId = bin.getId();
-      if (binsById.hasOwnProperty(binId)) {
-        binsById[binId].points.push(point);
-      } else {
-        binsById[binId] = {
-          i: bin.i,
-          j: bin.j,
-          x: bin.getX(),
-          y: bin.getY(),
-          id: binId,
-          points: [point],
-        };
-      }
-      }
-    }
-
-    for (binId in binsById) {
-      if (binsById.hasOwnProperty(binId)) {
-        bin = binsById[binId];
-        bins.push(bin);
-      }
-    }
-
-    radiusScaler = makeRadiusScaler(area, bins);
-    m = bins.length;
-
-    while (j < m) {
-      addHexAttrs(bins[j], area, radiusScaler, colorScaler);
-      j += 1;
-    }
-
-    return bins;
-
-  }
-
-  function makePoints(area, data) {
-
-    var n = data.length
-      , i = 0
-      , datum
-      , point
-      , bin
-      , points = []
-    ;
-
-    while (i < n) {
-      datum = data[i];
-      i += 1;
-      if (datum.y < 28 && datum.x < 25 && datum.x > -25) { // for consistency
-      point = asPoint.call(datum);
-      point.area = area;
-      bin = point.getBin();
-      point.bin = {
-        i: bin.i,
-        j: bin.j,
-        x: bin.getX(),
-        y: bin.getY(),
-        id: bin.getId(),
-      }
-      points.push(point);
-      } // for consistency
-    }
-
-    return points;
-
-  }
-
-  function makeBins(area, points) {
-
-    var n = points.length
-      , i = 0
-      , point
-      , bin
-      , binId
-      , binsById = {}
-      , radiusScaler
-      , bins = []
-      , m = 0
-      , j = 0
-    ;
-
-    while (i < n) {
-      point = points[i];
-      i += 1;
-      bin = point.bin
-      binId = bin.id;
-      if (binsById.hasOwnProperty(binId)) {
-        binsById[binId].points.push(point);
-      } else {
-        binsById[binId] = {
-          i: bin.i,
-          j: bin.j,
-          x: bin.x,
-          y: bin.y,
-          id: binId,
-          points: [point],
-        };
-      }
-    }
-
-    for (binId in binsById) {
-      if (binsById.hasOwnProperty(binId)) {
-        bin = binsById[binId];
-        bins.push(bin);
-      }
-    }
-
-    radiusScaler = makeRadiusScaler(area, bins);
-    m = bins.length;
-
-    while (j < m) {
-      addHexAttrs(bins[j], area, radiusScaler, colorScaler);
-      j += 1;
-    }
-
-    return bins;
-
-  }
-
-  function __makeBins(area, points) {
-
-    var groups = Q(points).groupBy('bin')
-      , n = groups.length
-      , i = 0
-      , group
-      , radiusScaler
-      , bins = []
-      , m = 0
-      , j = 0
-    ;
-    while (i < n) {
-      group = groups[i];
-      i += 1;
-      bins.push({
-        i: group.bin.i,
-        j: group.bin.j,
-        x: group.bin.x,
-        y: group.bin.y,
-        id: group.bin.id,
-        points: group.$,
-      });
-    }
-
-    radiusScaler = makeRadiusScaler(area, bins);
-    m = bins.length;
-
-    while (j < m) {
-      addHexAttrs(bins[j], area, radiusScaler, colorScaler);
-      j += 1;
-    }
-
-    return bins;
-
-  }
-
-
-
-  this.makePoints = makePoints;
-  this.makeBins = makeBins;
-
-
-
-}).call(this);
-
-//// app.jsx ////
-
 /** @jsx React.DOM */
 
 
@@ -425,131 +7,6 @@ var area = new Area({
   width: 600,
   height: 375,
   hexagonsPerRow: 26,
-});
-
-
-
-var TeamChoice = React.createClass({
-
-  onClick: function (e) {
-    e.preventDefault();
-    this.props.selectTeam(this.props.abbr);
-    this.props.loadShotsFromServer(this.props.abbr);
-    return false;
-  },
-
-  render: function () {
-    return (
-      <li onClick={this.onClick} className={this.props.isActive ? 'active' : ''}>
-        <a href="#">{this.props.locating + ' ' + this.props.nickname}</a>
-      </li>
-    );
-  },
-
-});
-
-
-
-var DivisionChoice = React.createClass({
-
-  onClick: function (e) {
-    e.preventDefault();
-    this.props.selectDivision(this.props.division);
-    return false;
-  },
-
-  render: function () {
-    var teamChoices = this.props.teams.map(function (team) {
-      return (
-        <TeamChoice
-         loadShotsFromServer={this.props.loadShotsFromServer}
-         selectTeam={this.props.selectTeam}
-         locating={team.locating}
-         nickname={team.nickname}
-         isActive={this.props.activeTeam === team.abbr}
-         abbr={team.abbr}
-         key={team.abbr}
-        />
-      );
-    }.bind(this));
-    return (
-      <li onClick={this.onClick} className={this.props.isActive ? 'active' : ''}>
-        <a href="#">{this.props.division}</a>
-        <ul className='nav'>
-          {teamChoices}
-        </ul>
-      </li>
-    );
-  },
-
-});
-
-
-
-var TeamNav = React.createClass({
-
-  getInitialState: function () {
-    return {
-      divisions: [],
-      selectedDivision: null,
-      selectedTeam: null,
-    };
-  },
-
-  selectDivision: function (divisionName) {
-    this.setState({selectedDivision: divisionName});
-  },
-
-  selectTeam: function (teamAbbr) {
-    this.setState({selectedTeam: teamAbbr});
-  },
-
-  loadTeamsFromServer: function () {
-    $.ajax({
-      url: 'http://localhost:5000/api/teams',
-      success: function (data) {
-        var divisionNames = [
-          'Atlantic', 'Central', 'Southeast',
-          'Pacific', 'Northwest', 'Southwest',
-        ];
-        var divisions = divisionNames.map(function (divisionName) {
-          var teams = Q(data.teams).findAll({division: divisionName});
-          return {
-            teams: teams,
-            division: divisionName,
-          };
-        });
-        this.setState({divisions: divisions});
-      }.bind(this),
-    });
-  },
-
-  componentWillMount: function () { this.loadTeamsFromServer(); },
-
-  render: function () {
-    var divisionChoices = this.state.divisions.map(function (division) {
-      return (
-        <DivisionChoice
-         loadShotsFromServer={this.props.loadShotsFromServer}
-         selectDivision={this.selectDivision}
-         selectTeam={this.selectTeam}
-         division={division.division}
-         isActive={this.state.selectedDivision === division.division}
-         activeTeam={this.state.selectedTeam}
-         teams={division.teams}
-         key={division.division}
-        />
-      );
-    }.bind(this));
-    return (
-      <div className="bs-sidebar hidden-print" role="complementary">
-        <ul className="nav bs-sidenav">
-          {divisionChoices}
-        </ul>
-      </div>
-    );
-  },
-
 });
 
 
@@ -615,21 +72,40 @@ var Hexagon = React.createClass({
 
 
 
-var ShotChart = React.createClass({
+var ChartArea = React.createClass({
 
   render: function () {
-    var i = 0
-      , n = this.props.bins.length
-      , bin
-      , hexagons = []
-      , style = {
+    console.log('[LOGGING]\t', 'ChartArea', 'render', this.state);
+    var style = {
       width: area.width,
       height: area.height,
       backgroundSize: 500,
       backgroundImage: "url('/static/court.png')",
       backgroundRepeat: 'no-repeat',
       backgroundPosition: 'bottom center',
-    }
+      margin: '0 auto',
+    };
+    return (
+      <div className='row'>
+        <div style={style}>
+          {this.props.chartContents}
+        </div>
+      </div>
+    );
+  },
+
+});
+
+
+
+var ShotChart = React.createClass({
+
+  render: function () {
+    console.log('[LOGGING]\t', 'ShotChart', 'render', this.state);
+    var i = 0
+      , n = this.props.bins.length
+      , bin
+      , hexagons = []
     ;
     while (i < n) {
       bin = this.props.bins[i];
@@ -648,11 +124,9 @@ var ShotChart = React.createClass({
       );
     }
     return (
-      <div style={style}>
-        <svg width={area.width} height={area.height}>
-          {hexagons}
-        </svg>
-      </div>
+      <svg width={area.width} height={area.height}>
+        {hexagons}
+      </svg>
     );
   },
 
@@ -681,13 +155,14 @@ var Search = React.createClass({
   getInitialState: function () {
     return {
       selectedOption: 'Offense',
-      selectedTeamAbbr: null,
+      selectedTeam: null,
     };
   },
 
   selectOption: function (option) { this.setState({selectedOption: option}); },
 
   setTypeAhead: function (data) {
+    console.log('[LOGGING]\t', 'Search', 'setTypeAhead', this.state);
     $.ajax({
       url: 'http://localhost:5000/api/teams',
       success: function (data) {
@@ -705,7 +180,7 @@ var Search = React.createClass({
         $el.typeahead({name: 'team-search', local: teams, valueKey: 'name',});
         $el.on('typeahead:selected', function (e, datum) {
           e.preventDefault();
-          this.setState({selectedTeamAbbr: datum.abbr});
+          this.setState({selectedTeam: datum});
           return false;
         }.bind(this));
       }.bind(this),
@@ -715,11 +190,12 @@ var Search = React.createClass({
   componentDidMount: function () { this.setTypeAhead(); },
 
   onSubmit: function (e) {
+    console.log('[LOGGING]\t', 'Search', 'onSubmit', this.state);
     e.preventDefault();
-    if (this.state.selectedTeamAbbr) {
+    if (this.state.selectedTeam) {
       this.props.loadShotsFromServer(
         this.state.selectedOption.toLowerCase(),
-        this.state.selectedTeamAbbr
+        this.state.selectedTeam
       );
     }
     $(this.refs.search.getDOMNode()).typeahead('setQuery', '');
@@ -727,6 +203,7 @@ var Search = React.createClass({
   },
 
   render: function () {
+    console.log('[LOGGING]\t', 'Search', 'render', this.state);
     return (
       <form className='form-inline' role='form' onSubmit={this.onSubmit}>
         <div className='input-group'>
@@ -755,19 +232,215 @@ var Search = React.createClass({
 
 
 
+var Statistic = React.createClass({
+
+  render: function () {
+    return (
+      <div className='col-md-3 stat'>
+        <h3>{this.props.value}</h3>
+        <h4 className='text-muted'>{this.props.name}</h4>
+      </div>
+    );
+  },
+
+});
+
+
+
+var Stats = React.createClass({
+
+  render: function () {
+    console.log('[LOGGING]\t', 'Stats', 'render', this.state);
+    var q = Q(this.props.points)
+      , fga = this.props.points.length
+      , fgm = q.findAll({event_desc: 'Field Goal Made'}).length
+      , wpa = q.findAll({point_value: 2}).length
+      , wpm = q.findAll({event_desc: 'Field Goal Made', point_value: 2}).length
+      , wpp = fga === 0 ? '\u00A0' : (100*(wpm/wpa)).toFixed(1)
+      , hpp = fga === 0 ? '\u00A0' : (100*((fgm - wpm)/(fga - wpa))).toFixed(1)
+      , pts = getSumPts(this.props.points)
+      , efg = fga === 0 ? '\u00A0' : (pts/fga).toFixed(2)
+    ;
+    return (
+      <div className='row'>
+        <Statistic value={fga === 0 ? '\u00A0' : fga} name='FGA' />
+        <Statistic value={efg} name='PPS' />
+        <Statistic value={wpp} name='2p%' />
+        <Statistic value={hpp} name='3p%' />
+      </div>
+    );
+  },
+
+});
+
+
+
+var Row = React.createClass({
+
+  render: function () {
+    var shot = this.props.shot;
+    return (
+      <tr>
+        <td>{shot.date.toUTCString().slice(5, 16)}</td>
+        <td>{shot.off_abbr}</td>
+        <td>{shot.is_home ? '@' : '\u00A0'}</td>
+        <td>{shot.def_abbr}</td>
+        <td>{[shot.shooter.first_name, shot.shooter.last_name].join(' ')}</td>
+        <td>{shot.details}</td>
+        <td>{shot.point_value}</td>
+        <td>{shot.is_make ? 'Made' : 'Missed'}</td>
+      </tr>
+    );
+  },
+
+});
+
+
+
+var PageNumber = React.createClass({
+
+  onClick: function (e) {
+    e.preventDefault();
+    this.props.onClick(this.props.key);
+    return false;
+  },
+
+  render: function () {
+    return (
+      <li className={this.props.isActive ? 'active' : ''}>
+        <a href='#' onClick={this.onClick}>{this.props.key}</a>
+      </li>
+    );
+  },
+
+});
+
+
+
+var Table = React.createClass({
+
+  getInitialState: function () {
+    return {
+      page: 1,
+    };
+  },
+
+  setPage: function (page) { this.setState({page: page}); },
+
+  render: function () {
+    console.log('[LOGGING]\t', 'Table', 'render', this.state);
+    var rowsPerPage = this.props.rowsPerPage
+
+      , numPages = Math.ceil(this.props.shots.length/rowsPerPage)
+      , i = this.state.page - 4
+      , leftExcess = Math.max(1 - i, 0)
+      , n = i + 9
+      , rightExcess = Math.max(n - numPages, 0)
+      , pages = []
+
+      , until = this.state.page*rowsPerPage
+      , start = until - rowsPerPage
+      , shot
+      , key
+      , rows = []
+    ;
+    i += leftExcess;
+    n += leftExcess;
+    i -= rightExcess;
+    n -= rightExcess;
+    while (i <= n) {
+      pages.push(<PageNumber isActive={i === this.state.page} onClick={this.setPage} key={i} />);
+      i += 1;
+    }
+    while (start < until) {
+      shot = this.props.shots[start];
+      start += 1;
+      key = [
+        shot.game_id,
+        shot.quarter,
+        shot.minutes,
+        shot.seconds,
+        shot.x,
+        shot.y,
+      ].join(',');
+      rows.push(<Row shot={shot} key={key} />);
+    }
+    return (
+      <div className='col-md-12'>
+        <table className='table table-condensed table-hover'>
+          <thead>
+            <tr>
+              <th>{'Date'}</th>
+              <th>Team</th>
+              <th>{'\u00A0'}</th>
+              <th>Oppt</th>
+              <th>Shooter</th>
+              <th>Description</th>
+              <th>Value</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows}
+          </tbody>
+        </table>
+        <ul className='pagination'>
+          {pages}
+        </ul>
+      </div>
+    );
+  },
+
+});
+
+/*
+              <th className='dropdown'>
+                <a href='#' className='dropdown-toggle' data-toggle='dropdown'>
+                  {'Date'}
+                </a>
+                <ul className='dropdown-menu'>
+                  <li><a href='#'>20131225</a></li>
+                  <li><a href='#'>20131224</a></li>
+                </ul>
+              </th>
+              <th className='dropdown'>
+                <a href='#' className='dropdown-toggle' data-toggle='dropdown'>
+                  Value
+                </a>
+                <ul className='dropdown-menu'>
+                  {pointValues}
+                </ul>
+              </th>
+              <th className='dropdown'>
+                <a href='#' className='dropdown-toggle' data-toggle='dropdown'>
+                  Value
+                </a>
+                <ul className='dropdown-menu'>
+                  {pointValues}
+                </ul>
+              </th>
+*/
+
+
 var App = React.createClass({
 
   getInitialState: function () {
     return {
+      team: null,
       points: [],
       isLoading: false,
     };
   },
 
-  loadShotsFromServer: function (option, value) {
-    this.setState({isLoading: true});
+  loadShotsFromServer: function (option, team) {
+    console.log('[LOGGING]\t', 'App', 'loadShotsFromServer', this.state);
+    this.setState({
+      team: team,
+      points: [],
+      isLoading: true,
+    });
     $.ajax({
-      url: 'http://localhost:5000/api/shots/' + option + '/' + value,
+      url: 'http://localhost:5000/api/shots/' + option + '/' + team.abbr,
       success: function (data) {
         var points = makePoints(area, data);
         this.setState({
@@ -779,23 +452,51 @@ var App = React.createClass({
   },
 
   render: function () {
-    var chartArea = this.state.isLoading
-      ? <h3>LOADING...</h3>
-      : <ShotChart bins={makeBins(area, this.state.points)} />
+    console.log('[LOGGING]\t', 'App', 'render', this.state);
+    var chartContents = this.state.isLoading
+        ? <Spinner />
+        : <ShotChart bins={makeBins(area, this.state.points)} />
+      , team = this.state.team
+      , teamName = team
+        ? <h4>{team.name.toUpperCase()}</h4>
+        : <h4 className='text-muted'>Choose a team</h4>
+      , table = this.state.points.length > 0 ? <Table shots={this.state.points} rowsPerPage={20} /> : <table></table>;
     ;
     return (
       <div>
-        <div className='col-md-4'>
-          <Search loadShotsFromServer={this.loadShotsFromServer} />
-        </div>
-        <div className='col-md-8'>
-          {chartArea}
+        <div className='col-md-12'>
+
+
+          <div className='row marg-bot'>
+            <div className='col-md-4'>
+              <Search loadShotsFromServer={this.loadShotsFromServer} />
+            </div>
+          </div>
+
+
+          <div className='row marg-bot'>
+            <div className='col-md-4'>
+              {teamName}
+              <Stats points={this.state.points} />
+            </div>
+            <div className='col-md-8'>
+              <ChartArea chartContents={chartContents} />
+            </div>
+          </div>
+
+
+          <div className='row'>
+            {table}
+          </div>
+
+
         </div>
       </div>
     );
   },
 
 });
+
 
 
 React.renderComponent(<App />, document.getElementById('app'));
