@@ -1,5 +1,5 @@
 (function () {
-var root = this;
+
 
 
   function Area(options) {
@@ -240,62 +240,13 @@ var root = this;
 
   }
 
-  /*function _makeBins(area, data) {
-
-    var n = data.length
-      , i = 0
-      , datum
-      , point
-      , bin
-      , binId
-      , binsById = {}
-      , radiusScaler
-      , bins = []
-      , m = 0
-      , j = 0
+  function makeDate(yyyymmdd) {
+    var year = yyyymmdd.substr(0, 4)
+      , month = yyyymmdd.substr(4, 2)
+      , day = yyyymmdd.substr(6, 2)
     ;
-
-    while (i < n) {
-      datum = data[i];
-      i += 1;
-      if (datum.y < 28 && datum.x < 25 && datum.x > -25) {
-        point = asPoint.call(datum);
-        point.area = area;
-        bin = point.getBin();
-        binId = bin.getId();
-        if (binsById.hasOwnProperty(binId)) {
-          binsById[binId].points.push(point);
-        } else {
-          binsById[binId] = {
-            i: bin.i,
-            j: bin.j,
-            x: bin.getX(),
-            y: bin.getY(),
-            id: binId,
-            points: [point],
-          };
-        }
-      }
-    }
-
-    for (binId in binsById) {
-      if (binsById.hasOwnProperty(binId)) {
-        bin = binsById[binId];
-        bins.push(bin);
-      }
-    }
-
-    radiusScaler = makeRadiusScaler(area, bins);
-    m = bins.length;
-
-    while (j < m) {
-      addHexAttrs(bins[j], area, radiusScaler, colorScaler);
-      j += 1;
-    }
-
-    return bins;
-
-  }*/
+    return new Date(year, month, day);
+  }
 
   function makePoints(area, data) {
 
@@ -305,12 +256,14 @@ var root = this;
       , point
       , bin
       , points = []
+      , game
     ;
 
     while (i < n) {
       datum = data[i];
       i += 1;
       if (datum.y < 28 && datum.x < 25 && datum.x > -25) {
+        // Point stuff
         point = asPoint.call(datum);
         point.area = area;
         bin = point.getBin();
@@ -321,11 +274,32 @@ var root = this;
           y: bin.getY(),
           id: bin.getId(),
         }
+        // Shot stuff
+        game = point.game_id.split('-');
+        point.id = [
+          point.game_id,
+          point.quarter,
+          point.minutes,
+          point.seconds,
+          point.x,
+          point.y,
+        ].join(',');
+        point.shooter = point.players[0];
+        point.shooter_name = [
+          point.shooter.first_name,
+          point.shooter.last_name,
+        ].join(' ');
+        point.off_abbr = point.shooter.team_abbr;
+        point.is_home = point.off_abbr === point.home_abbr;
+        point.def_abbr = point.is_home ? point.away_abbr : point.home_abbr;
+        point.date = makeDate(game[0]);
+        point.is_make = point.event_desc === 'Field Goal Made';
+        // add it to the collection
         points.push(point);
       }
     }
 
-    root.points = points; return points;
+    return points;
 
   }
 
